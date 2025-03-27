@@ -1,0 +1,170 @@
+---
+title: "Informe PEC1"
+author: "Alejandro García"
+date: "2025-03-24"
+output:
+  pdf_document:
+    latex_engine: xelatex
+    toc: true
+    toc_depth: 3
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+  word_document:
+    toc: true
+    toc_depth: '3'
+---
+
+# Resumen
+
+En este trabajo hemos realizado una exploración de un dataset que contiene medidas de metabolitos procedentes de pacientes con caquexia. La caquexia es una afección caracterizada por una pérdida de más del 10 % del peso corporal, que incluye pérdida de masa muscular y grasa, en una persona que no está tratando de perder peso. También está asociados con otras enfermedades tales como el cáncer. El objetivo es identificar diferencias en los perfiles metabólicos de estos pacientes para así poder entender mejor la enfermedad y tratar de obtener alguna terapia para abordarla. Hemos escogido un dataset proveniente de (https://rest.xialab.ca/api/download/metaboanalyst/human_cachexia.csv) y en primer hemos creado un objeto *SummarizedExperiment* con los datos de dicho dataset. La clase *SummarizedExperiment* es una extensión de ExpressionSet, utilizada por muchas aplicaciones y bases de datos como *metabolomicsWorkbench*. A continuación, hemos procedido a acceder a los datos una vez creado el objeto y hemos realizado dos tipos de análisis: un análisis univariante para ver la dispersión de los datos y comprobar que es mejor trabajar tomando logarítmos de los datos; y un análisis multivariante en el cual hemos podido observar diferentes patrones entre los dos grupos de pacientes del dataset.   
+
+# Objetivos
+
+El objetivo principal de esta PEC es realizar un análisis exploratorio de unos datos obtenidos de (https://rest.xialab.ca/api/download/metaboanalyst/human_cachexia.csv) utilizando el programa estadístico R y las librerías de datos ómicos integradas en Bioconductor. En concreto, se requiere que los datos se carguen en un objeto de clase SummarizedExperiment y que se acceda a ellos a través de este objeto. Otro objetivo es familarizarnos con el entorno de GitHub como sistema de control de versiones. Crearemos un repositorio en el que almacenaremos los resultados de este trabajo. 
+
+# Materiales y métodos
+
+Los datos con los que se va a realizar este trabajo son los obtenidos de (https://rest.xialab.ca/api/download/metaboanalyst/human_cachexia.csv). Estos datos provienen de un estudio realizado en pacientes con caquexia. La caquexia es una afección caracterizada por una pérdida de más del 10 % del peso corporal, que incluye pérdida de masa muscular y grasa, en una persona que no está tratando de perder peso. También está asociados con otras enfermedades tales como el cáncer. El estudio del perfil metabólico de estos pacientes comparados con el de personas sanas podría ayudarnos a entender mejor cómo actúa la enfermedad en los pacientes y dar índicios para una posible cura de la misma.  
+El dataset se compone de 77 muestras de orina. Estas muestras de orina provienen de dos grupos de pacientes: un grupo de 47 pacientes que sufren caquexia; y otro grupo compuesto de 30 pacientes control. El dataset se compone de:
+Una columna de identificación de los pacientes, una columna donde se indica a qué grupo pertenece el paciente (control o caquéxico) y el resto son columnas donde se mide la concentración de metabolitos. Excepto las dos primeras columnas, todas las demás contienen valores numéricos. Las muestras no están aparedas, es decir, todos los pacientes representados en el dataset son distintos y no se han detectado valores ausentes en el dataset.
+Vamos a realizar una exploración de los datos que va a consistir en:
+ - Análisis univariante de los datos, mediante boxplots y/o histogramas.
+ - Análisis multivariante de los datos, mediante Análisis de componentes principales y agrupamiento jerárquico.
+(Ref: https://github.com/ASPteaching/Analisis_de_datos_omicos-Ejemplo_o-Microarrays)
+
+En primer lugar, vamos a explicar como vamos a crear el objeto *SummarizedExperiment*
+
+## Selección de los datos
+
+Vamos a cargar los datos usando la función *read.csv* ya que los datos están en formato .csv
+
+```{r}
+datos <- read.csv("human_cachexia.csv")
+head(datos)
+```
+
+## creación del *SummarizedExperiment*
+
+Como hemos avanzado, las dos primeras columnas indican la identificación del paciente y el grupo al que pertenecen. Estas dos columnas nos serviran como información de las filas a la hora de construir el objeto *SummarizedExperiment*. Vemos también que las mediciones empiezan a partir de la tercera columna.
+
+```{r}
+library(SummarizedExperiment)
+# Separar los datos (valores de metabolitos) y metadatos (información como pacientes y categorías)
+metabolitos <- as.matrix(datos[, -c(1, 2)])  # creamos la matriz con los datos de las medidas de los metabolitos
+rownames(metabolitos) <- datos$Patient.ID
+metadatos <- data.frame(Grupo = datos$Muscle.loss, row.names = datos$Patient.ID )
+se <- SummarizedExperiment(
+    assays = list(counts = t(metabolitos)),
+    colData = metadatos
+)
+se
+save(se, file = "summarizedexperiment.rda")
+```
+
+
+
+
+# Resultados
+
+## Estructura de los datos
+
+*SummarizedExperiment* es un contenedor de tipo matriz en el que las filas representan características de interés (en este caso, la información de los pacientes) y las columnas representan muestras (en este caso los metabolitos). Los objetos contienen uno o más ensayos, cada uno representado por un objeto tipo matriz de modo numérico o de otro tipo. Las filas de un objeto *SummarizedExperiment* representan características de interés. La información sobre estas características se almacena en un objeto DataFrame, accesible mediante la función rowData(). Cada fila del DataFrame proporciona información sobre la característica en la fila correspondiente del objeto SummarizedExperiment. Las columnas del DataFrame representan diferentes atributos de las características de interés. Para recuperar los datos del experimento de un objeto SummarizedExperiment se puede utilizar el accesorio assays(). Un objeto puede tener múltiples conjuntos de datos de ensayos, a cada uno de los cuales se puede acceder utilizando el operador $. El conjunto de datos de las vías respiratorias contiene sólo un ensayo (recuentos). Aquí cada fila representa una transcripción genética y cada columna una de las muestras.
+
+
+```{r}
+head(assays(se)$counts)
+rowData(se)
+colData(se)
+```
+
+## Exploración de los datos
+
+### Análisis univariante
+
+Una vez extraídos los datos y vista su estructura, podemos hacer una exploración básica. Podemos ver su distribución mediante el uso de boxplots. Vamos a ver cómo se distribuyen los datos para el primer metabolito.
+
+```{r}
+# Gráfico de caja para un metabolito en particular
+boxplot(assay(se)[1, ] ~ colData(se)$Grupo, 
+        main = "Distribucion del Metabolito 1",
+        xlab = "Grupo", ylab = "Anhydro_beta_D_glucose" )
+
+```
+
+Como los datos se ven muy asimétricos procedemos a tomar logaritmos
+
+```{r}
+boxplot(log2(assay(se)[1, ] + 1)~colData(se)$Grupo, 
+        main = "Distribución del Metabolito 1",
+        xlab = "Grupo", ylab = "Anhydro.beta.D.glucose")
+```
+
+Vemos que es bastante mejor trabajar con los datos logarítmicos. 
+
+### Análisis multivariante
+
+Vamos a empezar realizando un análisis de componentes principales. Con este análisis podremos observar si existen algunos metabolitos que estén causando diferencias entre los dos grupos que tenemos de pacientes. Graficando los dos primeros componentes suele ser suficiente ya que toda la variación está explicada con ellos.
+
+```{r}
+pca <- prcomp(t(log2(assay(se) + 1)), scale. = TRUE)
+loads<- round(pca$sdev^2/sum(pca$sdev^2)*100,1)
+```
+
+Y graficar los dos primeros componentes
+
+```{r}
+library(ggplot2)
+df_pca <- data.frame(
+    PC1 = pca$x[, 1],
+    PC2 = pca$x[, 2],
+    Grupo = colData(se)$Grupo
+)
+ggplot(df_pca, aes(x = PC1, y = PC2, colour = Grupo)) +
+    geom_point(size = 3) +
+    theme_minimal() +
+    labs(title = "Análisis de Componentes Principales (PCA)",
+         x = "Componente Principal 1",
+         y = "Componente Principal 2")
+```
+
+Vemos que hay ciertos pacientes que se ven alejados del grupo de pacientes control, lo cual puede indicar la actividad de metabolitos que estén causando esas diferencias.
+
+Ahora vamos a realizar un agrupamiento jerárquico por si podemos visualizar algún tipo de patrón
+
+```{r}
+# Calcular la matriz de distancia Euclidiana
+dist_matrix <- dist(t(log2(assay(se) + 1)), method = "euclidean")
+
+# Agrupamiento jerárquico
+hc <- hclust(dist_matrix, method = "complete")
+
+# Dendrograma
+plot(hc, labels = colData(se)$Grupo, main = "Agrupamiento Jerárquico",
+     xlab = "Muestras", ylab = "Distancia")
+
+clusters <- cutree(hc, k = 2)  # seleccionamos un nivel de corte = 2
+table(clusters)
+table(colData(se)$Grupo, clusters)
+
+```
+
+Como el dendograma está muy poblado es difícil ver patrones a simple vista. AL dividir en dos grupos vemos que hay las muestras se separan en 32 y 45. Y en el grupo de 32 vemos que 24 de ellos tienen la enfermedad. Esto al igual que el análisis de componentes principales muestra indicios de un perfil metabólico distinto entre individuos sanos y enfermos. 
+
+
+# Discusión
+
+En este trabajo hemos podido construir un *SummarizeExperiment* comprendiendo cómo se compone y cómo acceder a los datos a través de él. En cuanto a los datos, hemos podido observar que era mejor trabajar tomando logarítmos ya que en los boxplots que hemos realizado hemos podido observar asímetria que de no ser tenida en cuenta podría afectar a resultados posteriores o a la interpretación de los resultados. Por otro lado, gracias al análisis multivariante hemos podido ver indicios de diferencias metabólicas entre los dos grupos de pacientes, ya que en el análisis de componentes principales como en la agrupación jerárquica hemos visto ciertos patrones diferentes entre los dos grupos de pacientes.
+
+
+# Conclusión
+
+La programación orientada a objetos es una manera útil y organizada de tratar con grandes volúmenes de datos y proporciona muchas herramientas para analizarlos. Es importante hacer un análisis univariante de los datos para ver la dispersión y comprobar si es necesario hacer alguna transformación de estos. Gracias al análsis multivariante hemos podido ver indicios de perfiles metabólicos distintos entre los dos grupos de pacientes. 
+
+
+# Bibliografía
+
+- https://github.com/alejandrogjuoc/Garcia-Jesus-Alejandro-PEC1
+- https://bioconductor.org/packages/release/bioc/vignettes/SummarizedExperiment/inst/doc/SummarizedExperiment.html#constructing-a-summarizedexperiment
+- https://rest.xialab.ca/api/download/metaboanalyst/human_cachexia.csv 
